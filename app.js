@@ -9,7 +9,8 @@ const state = {
   duration: 0,
   currentTime: 0,
   pitch: 0,
-  looping: false
+  looping: false,
+  activeTrackIndex: 0
 };
 
 let api = null;
@@ -63,63 +64,23 @@ function initAlphaTab() {
       if (prefs.volume !== undefined) {
         track.playbackInfo.volume = prefs.volume;
       }
+      if (prefs.isMute !== undefined) {
+        track.playbackInfo.isMute = prefs.isMute;
+      }
+      if (prefs.isSolo !== undefined) {
+        track.playbackInfo.isSolo = prefs.isSolo;
+      }
     });
-    
-    // Setup tracks dropdown
-    const trackSelect = document.getElementById('track-select');
-    const instrumentSelect = document.getElementById('instrument-select');
-    
+
+    renderMixerTracks(score);
+
+    // Initialize first track
     if (score.tracks.length > 0) {
-      trackSelect.innerHTML = ''; // Clear loading
-      
-      score.tracks.forEach((track, index) => {
-        const option = document.createElement('option');
-        option.value = index;
-        option.textContent = track.name;
-        trackSelect.appendChild(option);
-      });
-
-      // Listen for track changes
-      trackSelect.addEventListener('change', (e) => {
-        const selectedIndex = parseInt(e.target.value, 10);
-        const selectedTrack = score.tracks[selectedIndex];
-
-        // Ensure we display tabs for guitars, but standard notation for drums
-        api.settings.display.staveProfile = selectedTrack.isPercussion ? 'Score' : 'Tab';
-        api.updateSettings();
-
-        // Update instrument select UI
-        instrumentSelect.value = selectedTrack.playbackInfo.program;
-        instrumentSelect.disabled = selectedTrack.isPercussion; // Disable changing drums for simplicity
-
-        // Update Volume UI
-        const volSlider = document.getElementById('track-volume-slider');
-        const volReadout = document.getElementById('track-volume-readout');
-        volSlider.value = selectedTrack.playbackInfo.volume;
-        volReadout.textContent = `${Math.round(selectedTrack.playbackInfo.volume * 100)}%`;
-
-        api.renderTracks([selectedTrack]); // Render the new track
-      });
-      
-      // Initialize first track correctly
-      const firstTrack = score.tracks[0];
-      api.settings.display.staveProfile = firstTrack.isPercussion ? 'Score' : 'Tab';
-      api.updateSettings();
-      api.renderTracks([firstTrack]);
-      
-      // Init UI
-      instrumentSelect.value = firstTrack.playbackInfo.program;
-      instrumentSelect.disabled = firstTrack.isPercussion;
-      
-      const volSlider = document.getElementById('track-volume-slider');
-      const volReadout = document.getElementById('track-volume-readout');
-      volSlider.value = firstTrack.playbackInfo.volume;
-      volReadout.textContent = `${Math.round(firstTrack.playbackInfo.volume * 100)}%`;
+      selectTrack(0);
     }
   });
 
   api.playerReady.on(() => {
-    // Player is ready
     updateTimeDisplay();
   });
 
@@ -127,21 +88,13 @@ function initAlphaTab() {
     state.currentTime = e.currentTime;
     state.duration = e.endTime;
     
-    // Update Slider
     const slider = document.getElementById("measure-slider");
     if (slider.dataset.isDragging !== "true") {
       slider.max = state.duration;
       slider.value = state.currentTime;
     }
     
-    // Update Readout
     updateTimeDisplay();
-    
-    // Update Measure Readout if available
-    if (e.currentTick) {
-       // Tick info can be used to roughly estimate measure if we parse the score details, 
-       // but for simplicity we'll just show time.
-    }
   });
 
   let selectionStart = null;
@@ -167,22 +120,17 @@ function initAlphaTab() {
     }
   });
 
-  // To prevent the selection getting stuck when the mouse leaves the container during drag
   document.addEventListener("mouseup", () => {
     if (isDragging) {
       isDragging = false;
       selectionStart = null;
-      // We don't apply the range if they let go outside the notation
     }
   });
 
   api.playerStateChanged.on((e) => {
-    // 0 = stopped, 1 = playing, 2 = paused
     state.playing = (e.state === 1);
-    
     document.getElementById("root").dataset.playing = state.playing ? "on" : "off";
     document.getElementById("control-play").setAttribute("aria-pressed", String(state.playing));
-    
     const playButton = document.getElementById("control-play");
     if (state.playing) {
       playButton.classList.add('is-playing');
@@ -190,6 +138,142 @@ function initAlphaTab() {
       playButton.classList.remove('is-playing');
     }
   });
+}
+
+function selectTrack(index) {
+  if (!api || !api.score) return;
+  state.activeTrackIndex = index;
+  const selectedTrack = api.score.tracks[index];
+
+  // Update UI Name
+  document.getElementById("current-track-name").textContent = selectedTrack.name;
+
+  // Render
+  api.settings.display.staveProfile = selectedTrack.isPercussion ? 'Score' : 'Tab';
+  api.updateSettings();
+  api.renderTracks([selectedTrack]);
+
+  // Update Mixer Modal UI highlights
+  document.querySelectorAll(".mixer-track-item").forEach(item => {
+    item.classList.toggle("is-active", parseInt(item.dataset.index) === index);
+  });
+}
+
+function renderMixerTracks(score) {
+  const container = document.getElementById("mixer-track-list");
+  container.innerHTML = "";
+
+  score.tracks.forEach((track, index) => {
+    const item = document.createElement("div");
+    item.className = "mixer-track-item";
+    item.dataset.index = index;
+
+    // Track Info (clickable to select/view)
+    const info = document.createElement("div");
+    info.className = "mixer-track-info";
+    info.innerHTML = `
+      <div class="mixer-track-name">${track.name}</div>
+      <div class="mixer-track-instrument">${track.isPercussion ? 'Drums' : 'Instrument ' + track.playbackInfo.program}</div>
+    `;
+    info.addEventListener("click", () => selectTrack(index));
+
+    // Controls
+    const controls = document.createElement("div");
+    controls.className = "mixer-controls";
+
+    // Instrument Dropdown (only for non-percussion)
+    if (!track.isPercussion) {
+      const select = document.createElement("select");
+      select.className = "mixer-prog-select";
+      const options = [
+        {val: 24, label: 'Acoustic Guitar'},
+        {val: 25, label: 'Acoustic (Steel)'},
+        {val: 27, label: 'Electric (Clean)'},
+        {val: 29, label: 'Overdrive'},
+        {val: 30, label: 'Distortion'},
+        {val: 33, label: 'Electric Bass'},
+        {val: 0, label: 'Piano'},
+        {val: 48, label: 'Strings'}
+      ];
+      // ensure current program is in the list
+      if (!options.find(o => o.val === track.playbackInfo.program)) {
+        options.push({val: track.playbackInfo.program, label: 'Custom (' + track.playbackInfo.program + ')'});
+      }
+      
+      options.forEach(opt => {
+        const o = document.createElement("option");
+        o.value = opt.val;
+        o.textContent = opt.label;
+        if (opt.val === track.playbackInfo.program) o.selected = true;
+        select.appendChild(o);
+      });
+
+      select.addEventListener("change", (e) => {
+        const newProgram = parseInt(e.target.value, 10);
+        track.playbackInfo.program = newProgram;
+        api.changeTrackProgram([track], newProgram);
+        api.tick(); // wakeup player
+        saveTrackPref(score.title, index, { program: newProgram });
+        info.querySelector('.mixer-track-instrument').textContent = 'Instrument ' + newProgram;
+      });
+      controls.appendChild(select);
+    }
+
+    // Solo Btn
+    const soloBtn = document.createElement("button");
+    soloBtn.className = `mixer-btn ${track.playbackInfo.isSolo ? 'is-active' : ''}`;
+    soloBtn.title = "Solo";
+    soloBtn.innerHTML = '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>';
+    soloBtn.addEventListener("click", () => {
+      const isSolo = !track.playbackInfo.isSolo;
+      api.changeTrackSolo([track], isSolo);
+      soloBtn.classList.toggle("is-active", isSolo);
+      saveTrackPref(score.title, index, { isSolo });
+    });
+    controls.appendChild(soloBtn);
+
+    // Mute Btn
+    const muteBtn = document.createElement("button");
+    muteBtn.className = `mixer-btn ${track.playbackInfo.isMute ? 'is-active' : ''}`;
+    muteBtn.title = "Mute";
+    muteBtn.innerHTML = '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>';
+    muteBtn.addEventListener("click", () => {
+      const isMute = !track.playbackInfo.isMute;
+      api.changeTrackMute([track], isMute);
+      muteBtn.classList.toggle("is-active", isMute);
+      saveTrackPref(score.title, index, { isMute });
+    });
+    controls.appendChild(muteBtn);
+
+    // Volume Slider
+    const volSlider = document.createElement("input");
+    volSlider.type = "range";
+    volSlider.className = "mixer-vol";
+    volSlider.min = 0;
+    volSlider.max = 2; // up to 200%
+    volSlider.step = 0.1;
+    volSlider.value = track.playbackInfo.volume;
+    volSlider.title = "Volume";
+    volSlider.addEventListener("input", (e) => {
+      const vol = parseFloat(e.target.value);
+      api.changeTrackVolume([track], vol);
+      saveTrackPref(score.title, index, { volume: vol });
+    });
+    controls.appendChild(volSlider);
+
+    item.appendChild(info);
+    item.appendChild(controls);
+    container.appendChild(item);
+  });
+}
+
+function saveTrackPref(songTitle, index, newPrefs) {
+  const songId = songTitle || "UnknownSong";
+  const storageKey = `am_tabs_${songId}`;
+  const savedPrefs = JSON.parse(localStorage.getItem(storageKey)) || {};
+  if (!savedPrefs[index]) savedPrefs[index] = {};
+  Object.assign(savedPrefs[index], newPrefs);
+  localStorage.setItem(storageKey, JSON.stringify(savedPrefs));
 }
 
 function bindControls() {
@@ -201,70 +285,22 @@ function bindControls() {
   const metronome = document.getElementById("control-metronome");
   const autoscrollButton = document.getElementById("control-autoscroll");
   
-  // Track settings UI
-  const trackSettingsBtn = document.getElementById("track-settings-btn");
-  const trackSettingsPanel = document.getElementById("track-settings-panel");
-  const instrumentSelect = document.getElementById("instrument-select");
-  const trackVolumeSlider = document.getElementById("track-volume-slider");
+  // Mixer Overlay logic
+  const openMixerBtn = document.getElementById("open-mixer-btn");
+  const closeMixerBtn = document.getElementById("close-mixer-btn");
+  const mixerOverlay = document.getElementById("mixer-overlay");
 
-  trackSettingsBtn.addEventListener("click", () => {
-    trackSettingsPanel.classList.toggle("hidden");
+  openMixerBtn.addEventListener("click", () => {
+    mixerOverlay.classList.remove("hidden");
   });
 
-  // Close panel if clicked outside
-  document.addEventListener("click", (e) => {
-    if (!trackSettingsBtn.contains(e.target) && !trackSettingsPanel.contains(e.target)) {
-      trackSettingsPanel.classList.add("hidden");
-    }
+  closeMixerBtn.addEventListener("click", () => {
+    mixerOverlay.classList.add("hidden");
   });
 
-  trackVolumeSlider.addEventListener("input", (e) => {
-    if (!api || !api.score) return;
-    const trackSelect = document.getElementById('track-select');
-    const selectedIndex = parseInt(trackSelect.value, 10);
-    const selectedTrack = api.score.tracks[selectedIndex];
-    
-    if (selectedTrack) {
-      const newVolume = parseFloat(e.target.value);
-      api.changeTrackVolume([selectedTrack], newVolume);
-      
-      document.getElementById('track-volume-readout').textContent = `${Math.round(newVolume * 100)}%`;
-      
-      // Save to localStorage
-      const songId = api.score.title || "UnknownSong";
-      const storageKey = `am_tabs_${songId}`;
-      const savedPrefs = JSON.parse(localStorage.getItem(storageKey)) || {};
-      if (!savedPrefs[selectedIndex]) savedPrefs[selectedIndex] = {};
-      savedPrefs[selectedIndex].volume = newVolume;
-      localStorage.setItem(storageKey, JSON.stringify(savedPrefs));
-    }
-  });
-
-  instrumentSelect.addEventListener("change", (e) => {
-    if (!api || !api.score) return;
-    const trackSelect = document.getElementById('track-select');
-    const selectedIndex = parseInt(trackSelect.value, 10);
-    const selectedTrack = api.score.tracks[selectedIndex];
-    
-    if (selectedTrack && !selectedTrack.isPercussion) {
-      const newProgram = parseInt(e.target.value, 10);
-      
-      // Update data model
-      selectedTrack.playbackInfo.program = newProgram;
-      
-      // Crucial: AlphaTab requires reloading midi and triggering a render refresh 
-      // or using the built-in change method if available in the specific wrapper
-      api.changeTrackProgram([selectedTrack], newProgram); 
-      // As a fallback to ensure playback engine picks it up
-      api.tick(); // small tick to wake up player
-
-      // Save to localStorage
-      const songId = api.score.title || "UnknownSong";
-      const storageKey = `am_tabs_${songId}`;
-      const savedPrefs = JSON.parse(localStorage.getItem(storageKey)) || {};
-      if (!savedPrefs[selectedIndex]) savedPrefs[selectedIndex] = {};
-      savedPrefs[selectedIndex].program = newProgram;
-      localStorage.setItem(storageKey, JSON.stringify(savedPrefs));
+  mixerOverlay.addEventListener("click", (e) => {
+    if (e.target === mixerOverlay) {
+      mixerOverlay.classList.add("hidden");
     }
   });
 
@@ -276,11 +312,8 @@ function bindControls() {
   autoscrollButton.addEventListener("click", () => {
     if (!api) return;
     state.autoscroll = !state.autoscroll;
-    
-    // 1 = Continuous, 0 = Off
     api.settings.player.scrollMode = state.autoscroll ? 1 : 0;
     api.updateSettings();
-
     autoscrollButton.setAttribute("aria-pressed", String(state.autoscroll));
     document.getElementById("autoscroll-readout").textContent = state.autoscroll ? "On" : "Off";
   });
@@ -296,15 +329,11 @@ function bindControls() {
 
   pitchButton.addEventListener("click", () => {
     if (!api || !api.score) return;
-    // Semitone steps for tuning
     const PITCH_STEPS = [0, 1, 2, 3, -3, -2, -1];
     const currentIndex = PITCH_STEPS.indexOf(state.pitch);
     const nextIndex = (currentIndex + 1) % PITCH_STEPS.length;
     state.pitch = PITCH_STEPS[nextIndex];
-    
-    // Change pitch for all tracks dynamically
     api.changeTrackTranspositionPitch(api.score.tracks, state.pitch);
-    
     const pitchText = state.pitch > 0 ? `+${state.pitch}` : String(state.pitch);
     document.getElementById("pitch-readout").textContent = pitchText;
   });
@@ -313,14 +342,12 @@ function bindControls() {
     if (!api) return;
     state.looping = !state.looping;
     api.isLooping = state.looping;
-    
     loopButton.setAttribute("aria-pressed", String(state.looping));
     document.getElementById("loop-readout").textContent = state.looping ? "On" : "Off";
   });
 
-  // Setup slider max/min
   slider.min = 0;
-  slider.step = 100; // ms step
+  slider.step = 100;
 
   slider.addEventListener("mousedown", () => {
     slider.dataset.isDragging = "true";
@@ -333,7 +360,6 @@ function bindControls() {
   });
   
   slider.addEventListener("input", (event) => {
-    // Visual update while dragging
     state.currentTime = Number(event.target.value);
     updateTimeDisplay();
   });
@@ -346,10 +372,8 @@ function bindControls() {
     metronome.querySelector("strong").textContent = state.metronome ? "On" : "Off";
   });
 
-  // Hotkeys
   window.addEventListener("keydown", (event) => {
     if (event.target instanceof HTMLInputElement) return;
-
     if (event.code === "Space") {
       event.preventDefault();
       if (api) api.playPause();
