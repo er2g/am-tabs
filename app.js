@@ -29,7 +29,8 @@ function initAlphaTab() {
     },
     display: {
       layoutMode: 'page', // or 'horizontal'
-      staveProfile: 'Tab'
+      // We remove strict 'Tab' profile from global settings 
+      // so it can dynamically switch for Drums vs Guitar
     },
     notation: {
       rhythmMode: 'ShowWithBeams'
@@ -65,8 +66,19 @@ function initAlphaTab() {
       trackSelect.addEventListener('change', (e) => {
         const selectedIndex = parseInt(e.target.value, 10);
         const selectedTrack = score.tracks[selectedIndex];
+
+        // Ensure we display tabs for guitars, but standard notation for drums
+        api.settings.display.staveProfile = selectedTrack.isPercussion ? 'Score' : 'Tab';
+        api.updateSettings();
+
         api.renderTracks([selectedTrack]); // Render the new track
       });
+      
+      // Initialize first track correctly
+      const firstTrack = score.tracks[0];
+      api.settings.display.staveProfile = firstTrack.isPercussion ? 'Score' : 'Tab';
+      api.updateSettings();
+      api.renderTracks([firstTrack]);
     }
   });
 
