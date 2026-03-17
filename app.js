@@ -211,8 +211,9 @@ function renderMixerTracks(score) {
       select.addEventListener("change", (e) => {
         const newProgram = parseInt(e.target.value, 10);
         track.playbackInfo.program = newProgram;
-        api.changeTrackProgram([track], newProgram);
-        api.tick(); // wakeup player
+        // Regenerate MIDI for the synth to apply instrument change
+        api.loadMidiForScore(); 
+        
         saveTrackPref(score.title, index, { program: newProgram });
         info.querySelector('.mixer-track-instrument').textContent = 'Instrument ' + newProgram;
       });
