@@ -50,8 +50,21 @@ function initAlphaTab() {
     document.querySelector('.hero-copy h1').innerHTML = `${score.title} <span>Tab</span>`;
     document.querySelector('.hero-meta a').textContent = score.artist || "Unknown Artist";
     
+    // Load saved preferences for this song
+    const songId = score.title || "UnknownSong";
+    const savedPrefs = JSON.parse(localStorage.getItem(`am_tabs_${songId}`)) || {};
+    
+    // Apply saved programs
+    score.tracks.forEach((track, index) => {
+      if (savedPrefs[index] !== undefined && !track.isPercussion) {
+        track.playbackInfo.program = savedPrefs[index];
+      }
+    });
+    
     // Setup tracks dropdown
     const trackSelect = document.getElementById('track-select');
+    const instrumentSelect = document.getElementById('instrument-select');
+    
     if (score.tracks.length > 0) {
       trackSelect.innerHTML = ''; // Clear loading
       
@@ -71,6 +84,10 @@ function initAlphaTab() {
         api.settings.display.staveProfile = selectedTrack.isPercussion ? 'Score' : 'Tab';
         api.updateSettings();
 
+        // Update instrument select UI
+        instrumentSelect.value = selectedTrack.playbackInfo.program;
+        instrumentSelect.disabled = selectedTrack.isPercussion; // Disable changing drums for simplicity
+
         api.renderTracks([selectedTrack]); // Render the new track
       });
       
@@ -79,6 +96,10 @@ function initAlphaTab() {
       api.settings.display.staveProfile = firstTrack.isPercussion ? 'Score' : 'Tab';
       api.updateSettings();
       api.renderTracks([firstTrack]);
+      
+      // Init UI
+      instrumentSelect.value = firstTrack.playbackInfo.program;
+      instrumentSelect.disabled = firstTrack.isPercussion;
     }
   });
 
@@ -164,6 +185,42 @@ function bindControls() {
   const slider = document.getElementById("measure-slider");
   const metronome = document.getElementById("control-metronome");
   const autoscrollButton = document.getElementById("control-autoscroll");
+  
+  // Track settings UI
+  const trackSettingsBtn = document.getElementById("track-settings-btn");
+  const trackSettingsPanel = document.getElementById("track-settings-panel");
+  const instrumentSelect = document.getElementById("instrument-select");
+
+  trackSettingsBtn.addEventListener("click", () => {
+    trackSettingsPanel.classList.toggle("hidden");
+  });
+
+  // Close panel if clicked outside
+  document.addEventListener("click", (e) => {
+    if (!trackSettingsBtn.contains(e.target) && !trackSettingsPanel.contains(e.target)) {
+      trackSettingsPanel.classList.add("hidden");
+    }
+  });
+
+  instrumentSelect.addEventListener("change", (e) => {
+    if (!api || !api.score) return;
+    const trackSelect = document.getElementById('track-select');
+    const selectedIndex = parseInt(trackSelect.value, 10);
+    const selectedTrack = api.score.tracks[selectedIndex];
+    
+    if (selectedTrack && !selectedTrack.isPercussion) {
+      const newProgram = parseInt(e.target.value, 10);
+      selectedTrack.playbackInfo.program = newProgram;
+      api.loadMidiForScore(); // Apply the sound change
+      
+      // Save to localStorage
+      const songId = api.score.title || "UnknownSong";
+      const storageKey = `am_tabs_${songId}`;
+      const savedPrefs = JSON.parse(localStorage.getItem(storageKey)) || {};
+      savedPrefs[selectedIndex] = newProgram;
+      localStorage.setItem(storageKey, JSON.stringify(savedPrefs));
+    }
+  });
 
   playButton.addEventListener("click", () => {
     if (!api) return;
