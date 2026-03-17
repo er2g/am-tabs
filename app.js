@@ -54,10 +54,14 @@ function initAlphaTab() {
     const songId = score.title || "UnknownSong";
     const savedPrefs = JSON.parse(localStorage.getItem(`am_tabs_${songId}`)) || {};
     
-    // Apply saved programs
+    // Apply saved programs & volumes
     score.tracks.forEach((track, index) => {
-      if (savedPrefs[index] !== undefined && !track.isPercussion) {
-        track.playbackInfo.program = savedPrefs[index];
+      const prefs = savedPrefs[index] || {};
+      if (prefs.program !== undefined && !track.isPercussion) {
+        track.playbackInfo.program = prefs.program;
+      }
+      if (prefs.volume !== undefined) {
+        track.playbackInfo.volume = prefs.volume;
       }
     });
     
@@ -88,6 +92,12 @@ function initAlphaTab() {
         instrumentSelect.value = selectedTrack.playbackInfo.program;
         instrumentSelect.disabled = selectedTrack.isPercussion; // Disable changing drums for simplicity
 
+        // Update Volume UI
+        const volSlider = document.getElementById('track-volume-slider');
+        const volReadout = document.getElementById('track-volume-readout');
+        volSlider.value = selectedTrack.playbackInfo.volume;
+        volReadout.textContent = `${Math.round(selectedTrack.playbackInfo.volume * 100)}%`;
+
         api.renderTracks([selectedTrack]); // Render the new track
       });
       
@@ -100,6 +110,11 @@ function initAlphaTab() {
       // Init UI
       instrumentSelect.value = firstTrack.playbackInfo.program;
       instrumentSelect.disabled = firstTrack.isPercussion;
+      
+      const volSlider = document.getElementById('track-volume-slider');
+      const volReadout = document.getElementById('track-volume-readout');
+      volSlider.value = firstTrack.playbackInfo.volume;
+      volReadout.textContent = `${Math.round(firstTrack.playbackInfo.volume * 100)}%`;
     }
   });
 
@@ -190,6 +205,7 @@ function bindControls() {
   const trackSettingsBtn = document.getElementById("track-settings-btn");
   const trackSettingsPanel = document.getElementById("track-settings-panel");
   const instrumentSelect = document.getElementById("instrument-select");
+  const trackVolumeSlider = document.getElementById("track-volume-slider");
 
   trackSettingsBtn.addEventListener("click", () => {
     trackSettingsPanel.classList.toggle("hidden");
@@ -202,6 +218,28 @@ function bindControls() {
     }
   });
 
+  trackVolumeSlider.addEventListener("input", (e) => {
+    if (!api || !api.score) return;
+    const trackSelect = document.getElementById('track-select');
+    const selectedIndex = parseInt(trackSelect.value, 10);
+    const selectedTrack = api.score.tracks[selectedIndex];
+    
+    if (selectedTrack) {
+      const newVolume = parseFloat(e.target.value);
+      api.changeTrackVolume([selectedTrack], newVolume);
+      
+      document.getElementById('track-volume-readout').textContent = `${Math.round(newVolume * 100)}%`;
+      
+      // Save to localStorage
+      const songId = api.score.title || "UnknownSong";
+      const storageKey = `am_tabs_${songId}`;
+      const savedPrefs = JSON.parse(localStorage.getItem(storageKey)) || {};
+      if (!savedPrefs[selectedIndex]) savedPrefs[selectedIndex] = {};
+      savedPrefs[selectedIndex].volume = newVolume;
+      localStorage.setItem(storageKey, JSON.stringify(savedPrefs));
+    }
+  });
+
   instrumentSelect.addEventListener("change", (e) => {
     if (!api || !api.score) return;
     const trackSelect = document.getElementById('track-select');
@@ -210,14 +248,22 @@ function bindControls() {
     
     if (selectedTrack && !selectedTrack.isPercussion) {
       const newProgram = parseInt(e.target.value, 10);
-      selectedTrack.playbackInfo.program = newProgram;
-      api.loadMidiForScore(); // Apply the sound change
       
+      // Update data model
+      selectedTrack.playbackInfo.program = newProgram;
+      
+      // Crucial: AlphaTab requires reloading midi and triggering a render refresh 
+      // or using the built-in change method if available in the specific wrapper
+      api.changeTrackProgram([selectedTrack], newProgram); 
+      // As a fallback to ensure playback engine picks it up
+      api.tick(); // small tick to wake up player
+
       // Save to localStorage
       const songId = api.score.title || "UnknownSong";
       const storageKey = `am_tabs_${songId}`;
       const savedPrefs = JSON.parse(localStorage.getItem(storageKey)) || {};
-      savedPrefs[selectedIndex] = newProgram;
+      if (!savedPrefs[selectedIndex]) savedPrefs[selectedIndex] = {};
+      savedPrefs[selectedIndex].program = newProgram;
       localStorage.setItem(storageKey, JSON.stringify(savedPrefs));
     }
   });
