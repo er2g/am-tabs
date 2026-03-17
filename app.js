@@ -31,6 +31,9 @@ function initAlphaTab() {
       layoutMode: 'page', // or 'horizontal'
       staveProfile: 'Tab'
     },
+    notation: {
+      rhythmMode: 'ShowWithBeams'
+    },
     player: {
       enablePlayer: true,
       soundFont: 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@latest/dist/soundfont/sonivox.sf2',
