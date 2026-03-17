@@ -49,10 +49,24 @@ function initAlphaTab() {
     document.querySelector('.hero-copy h1').innerHTML = `${score.title} <span>Tab</span>`;
     document.querySelector('.hero-meta a').textContent = score.artist || "Unknown Artist";
     
-    // Setup tracks dropdown or display active track
+    // Setup tracks dropdown
+    const trackSelect = document.getElementById('track-select');
     if (score.tracks.length > 0) {
-      const activeTrack = score.tracks[0];
-      document.querySelector('.track-copy strong').textContent = activeTrack.name;
+      trackSelect.innerHTML = ''; // Clear loading
+      
+      score.tracks.forEach((track, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = track.name;
+        trackSelect.appendChild(option);
+      });
+
+      // Listen for track changes
+      trackSelect.addEventListener('change', (e) => {
+        const selectedIndex = parseInt(e.target.value, 10);
+        const selectedTrack = score.tracks[selectedIndex];
+        api.renderTracks([selectedTrack]); // Render the new track
+      });
     }
   });
 

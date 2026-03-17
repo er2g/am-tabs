@@ -390,6 +390,24 @@ input {
   gap: 4px;
 }
 
+.track-dropdown {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f7f6f2;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  cursor: pointer;
+  max-width: 180px;
+}
+
+.track-dropdown option {
+  background: var(--bg-deep);
+  color: #fff;
+}
+
 .transport-cluster {
   flex: 1;
   gap: 12px;
