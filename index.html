@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AM Tabs | Benimle Ucmak Ister Misin?</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2318201c'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%237ecb87' stroke-width='5'/%3E%3Cpath d='M21 38c6 5 16 5 22 0M24 27h17M28 18h11' fill='none' stroke='%23f4fbf4' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="root" data-playing="off">
+    <div id="app">
+      <header id="song-header" class="hero-card">
+        <div class="hero-main">
+          <div class="hero-copy">
+            <div class="hero-kicker">Track: Yavuz Cetin Solo - Overdriven Guitar</div>
+            <h1>Benimle Ucmak Ister Misin? <span>Tab</span></h1>
+            <p class="hero-meta">
+              <a href="#">Yavuz Cetin</a>
+              <span>Revision from: 10/17/2024</span>
+              <span>Free tab view</span>
+            </p>
+          </div>
+          <div class="hero-actions">
+            <button id="favorite-toggle" class="circle-action" type="button" aria-label="Favorite">
+              <svg viewBox="0 0 32 32" width="26" height="26">
+                <circle cx="16" cy="16" r="14"></circle>
+                <path d="M16 8l2.4 5 5.6.6-4.2 3.7 1.2 5.6-5-2.8-5 2.8 1.2-5.6-4.2-3.7 5.6-.6z"></path>
+              </svg>
+            </button>
+            <div class="revision-card">
+              <span>Last edit</span>
+              <strong>10/17/2024</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-rail">
+          <div class="video-card">
+            <div class="video-thumb">
+              <div class="play-badge">Preview</div>
+            </div>
+            <div class="video-copy">
+              <strong>Synced video mock</strong>
+              <span>Full mix / Backing / Solo</span>
+            </div>
+          </div>
+          <a class="showroom-banner" href="#">
+            <span>Upgrade to Plus</span>
+            <strong>AI transcription of full tabs</strong>
+          </a>
+        </div>
+      </header>
+
+      <aside id="controls" class="control-bar">
+        <div class="track-switcher">
+          <div class="track-icon" aria-hidden="true">
+            <svg viewBox="0 0 28 28" width="28" height="28">
+              <path d="M9 20c0 2-1.5 3-3 3s-3-1-3-3 1.5-3 3-3c.7 0 1.3.2 2 .5V7l14-3v12c0 2-1.5 3-3 3s-3-1-3-3 1.5-3 3-3c.7 0 1.3.2 2 .5V7.2L9 9.4z"></path>
+            </svg>
+          </div>
+          <div class="track-copy">
+            <strong>Overdriven Guitar</strong>
+            <span>Yavuz Cetin Solo</span>
+          </div>
+        </div>
+
+        <div class="transport-cluster">
+          <button id="control-play" class="play-toggle" type="button" aria-pressed="false" title="Play">
+            <svg class="play-svg" viewBox="0 0 36 36" width="36" height="36" aria-hidden="true">
+              <circle cx="18" cy="18" r="17"></circle>
+              <polygon class="play-shape" points="14,10 27,18 14,26"></polygon>
+              <g class="pause-shape" aria-hidden="true">
+                <rect x="12.5" y="10" width="4.5" height="16" rx="1"></rect>
+                <rect x="20" y="10" width="4.5" height="16" rx="1"></rect>
+              </g>
+            </svg>
+          </button>
+
+          <div id="control-source" class="source-toggle" role="radiogroup" aria-label="Audio source">
+            <button class="source-option is-active" type="button" data-source="original" aria-pressed="true">Original</button>
+            <button class="source-option" type="button" data-source="synth" aria-pressed="false">Synth</button>
+          </div>
+
+          <button id="control-speed" class="tool-button" type="button">
+            <span class="tool-icon">S</span>
+            <span class="tool-copy">
+              <strong id="speed-readout">100%</strong>
+              <small>Speed</small>
+            </span>
+          </button>
+
+          <button id="control-pitch" class="tool-button" type="button">
+            <span class="tool-icon">P</span>
+            <span class="tool-copy">
+              <strong id="pitch-readout">0</strong>
+              <small>Pitch Shift</small>
+            </span>
+          </button>
+
+          <button id="control-loop" class="tool-button" type="button" aria-pressed="false">
+            <span class="tool-icon">L</span>
+            <span class="tool-copy">
+              <strong id="loop-readout">Off</strong>
+              <small>Loop</small>
+            </span>
+          </button>
+
+          <button class="tool-button" id="control-metronome" type="button" aria-pressed="true">
+            <span class="tool-icon">M</span>
+            <span class="tool-copy">
+              <strong>On</strong>
+              <small>Metronome</small>
+            </span>
+          </button>
+
+          <button class="tool-button" id="control-autoscroll" type="button" aria-pressed="true">
+            <span class="tool-icon">A</span>
+            <span class="tool-copy">
+              <strong id="autoscroll-readout">On</strong>
+              <small>Auto-Scroll</small>
+            </span>
+          </button>
+        </div>
+
+        <div class="timeline-cluster">
+          <div class="timeline-copy">
+            <strong id="measure-readout">Olcu 1 / 228</strong>
+            <span id="section-readout">Intro</span>
+          </div>
+          <input id="measure-slider" type="range" min="1" max="228" value="1" step="0.01" aria-label="Measure position">
+          <div class="time-copy" id="time-readout">00:00 / 06:00</div>
+        </div>
+      </aside>
+
+      <section id="showroom" class="showroom-panel">
+        <div class="showroom-card">
+          <div class="showroom-copy">
+            <span>Studio feel</span>
+            <strong>Large SVG tablature, sticky transport and animated cursor</strong>
+          </div>
+          <button class="showroom-button" type="button">Explore mock controls</button>
+        </div>
+      </section>
+
+      <main id="apptab" class="tab-page">
+        <section id="tablature" role="application" data-id="Print--free" data-print="off" data-editor="off"></section>
+      </main>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@latest/dist/alphaTab.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
