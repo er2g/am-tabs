@@ -212,14 +212,17 @@ function renderMixerTracks(score) {
         const newProgram = parseInt(e.target.value, 10);
         track.playbackInfo.program = newProgram;
         
-        // Changing program requires full MIDI recreation and model update
+        // Brute force update: finish model, reload MIDI, and re-render
         api.score.finish();
         api.loadMidiForScore(); 
+        api.render(); 
         
-        // If playing, restart to pick up the new synth
+        // If playing, we MUST stop and start to force the synth to re-initialize the channels
         if (state.playing) {
-          api.pause();
-          setTimeout(() => api.play(), 50);
+          api.stop();
+          setTimeout(() => {
+            api.play();
+          }, 100);
         }
         
         saveTrackPref(score.title, index, { program: newProgram });
