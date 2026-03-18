@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@coderline/alphatab": "^1.8.1",
+    "jsdom": "^29.0.0",
+    "playwright": "^1.58.2"
+  }
+}

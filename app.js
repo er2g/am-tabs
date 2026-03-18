@@ -8,8 +8,7 @@ const state = {
   source: "original",
   duration: 0,
   currentTime: 0,
-  pitch: 0,
-  looping: false,
+  looping: true,
   activeTrackIndex: 0
 };
 
@@ -47,34 +46,69 @@ function initAlphaTab() {
     file: 'https://www.alphatab.net/files/canon.gp'
   });
 
-  api.scoreLoaded.on(score => {
+  api.scoreLoaded.on(async (score) => {
     document.querySelector('.hero-copy h1').innerHTML = `${score.title} <span>Tab</span>`;
     document.querySelector('.hero-meta a').textContent = score.artist || "Unknown Artist";
-    
-    // Load saved preferences for this song
-    const songId = score.title || "UnknownSong";
-    const savedPrefs = JSON.parse(localStorage.getItem(`am_tabs_${songId}`)) || {};
-    
+
+    // Load saved preferences - try DB first, fallback to localStorage
+    let savedPrefs = {};
+    const dbId = window._activeSongDbId;
+    if (dbId) {
+      try {
+        savedPrefs = await dbGetTrackPrefs(dbId);
+      } catch (e) {
+        console.warn('[db] Failed to load prefs:', e);
+      }
+    }
+    if (Object.keys(savedPrefs).length === 0) {
+      const lsKey = score.title || "UnknownSong";
+      savedPrefs = JSON.parse(localStorage.getItem(`am_tabs_${lsKey}`)) || {};
+    }
+
     // Apply saved programs & volumes
     score.tracks.forEach((track, index) => {
       const prefs = savedPrefs[index] || {};
       if (prefs.program !== undefined && !track.isPercussion) {
         track.playbackInfo.program = prefs.program;
+        for (const staff of track.staves) {
+          for (const bar of staff.bars) {
+            for (const voice of bar.voices) {
+              for (const beat of voice.beats) {
+                for (const auto of beat.automations) {
+                  if (auto.type === 2) auto.value = prefs.program;
+                }
+              }
+            }
+          }
+        }
       }
-      if (prefs.volume !== undefined) {
-        track.playbackInfo.volume = prefs.volume;
-      }
-      if (prefs.isMute !== undefined) {
-        track.playbackInfo.isMute = prefs.isMute;
-      }
-      if (prefs.isSolo !== undefined) {
-        track.playbackInfo.isSolo = prefs.isSolo;
-      }
+      if (prefs.volume !== undefined) track.playbackInfo.volume = prefs.volume;
+      if (prefs.isMute !== undefined) track.playbackInfo.isMute = prefs.isMute;
+      if (prefs.isSolo !== undefined) track.playbackInfo.isSolo = prefs.isSolo;
     });
 
+    api.loadMidiForScore();
     renderMixerTracks(score);
 
-    // Initialize first track
+    // Update DB record with actual track info from score
+    if (dbId && typeof dbGetSong === 'function') {
+      dbGetSong(dbId).then(record => {
+        if (record && (!record.tracks || record.tracks.length === 0)) {
+          record.title = score.title || record.title;
+          record.artist = score.artist || record.artist;
+          record.trackCount = score.tracks.length;
+          record.tracks = score.tracks.map(t => ({
+            name: t.name,
+            instrument: t.isPercussion ? 'Drums' : t.playbackInfo.program,
+          }));
+          openDB().then(db => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).put(record);
+          });
+        }
+      }).catch(() => {});
+    }
+
     if (score.tracks.length > 0) {
       selectTrack(0);
     }
@@ -82,6 +116,11 @@ function initAlphaTab() {
 
   api.playerReady.on(() => {
     updateTimeDisplay();
+    // Apply initial metronome and loop state
+    api.metronomeVolume = state.metronome ? 1 : 0;
+    api.isLooping = state.looping;
+    // Initialize audio effects chain once player is ready
+    initEffects();
   });
 
   api.playerPositionChanged.on((e) => {
@@ -157,6 +196,9 @@ function selectTrack(index) {
   document.querySelectorAll(".mixer-track-item").forEach(item => {
     item.classList.toggle("is-active", parseInt(item.dataset.index) === index);
   });
+
+  // Apply this track's FX settings
+  if (typeof applyTrackFx === 'function') applyTrackFx(index);
 }
 
 function renderMixerTracks(score) {
@@ -210,21 +252,43 @@ function renderMixerTracks(score) {
 
       select.addEventListener("change", (e) => {
         const newProgram = parseInt(e.target.value, 10);
-        track.playbackInfo.program = newProgram;
-        
-        // Brute force update: finish model, reload MIDI, and re-render
-        api.score.finish();
-        api.loadMidiForScore(); 
-        api.render(); 
-        
-        // If playing, we MUST stop and start to force the synth to re-initialize the channels
-        if (state.playing) {
+
+        // Stop playback first if playing
+        const wasPlaying = state.playing;
+        if (wasPlaying) {
           api.stop();
+        }
+
+        // Update playbackInfo
+        track.playbackInfo.program = newProgram;
+
+        // Also update Instrument automations on beats - these override playbackInfo
+        // in the MidiFileGenerator, so without this the sound won't actually change
+        for (const staff of track.staves) {
+          for (const bar of staff.bars) {
+            for (const voice of bar.voices) {
+              for (const beat of voice.beats) {
+                for (const auto of beat.automations) {
+                  if (auto.type === 2) { // AutomationType.Instrument
+                    auto.value = newProgram;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Reload MIDI with updated program
+        api.loadMidiForScore();
+        api.render();
+
+        // Restart playback with new instrument
+        if (wasPlaying) {
           setTimeout(() => {
             api.play();
-          }, 100);
+          }, 200);
         }
-        
+
         saveTrackPref(score.title, index, { program: newProgram });
         info.querySelector('.mixer-track-instrument').textContent = 'Instrument ' + newProgram;
       });
@@ -273,13 +337,46 @@ function renderMixerTracks(score) {
     });
     controls.appendChild(volSlider);
 
+    // FX Toggle Button
+    const fxBtn = document.createElement("button");
+    fxBtn.className = "mixer-btn mixer-fx-btn";
+    fxBtn.title = "Effects";
+    fxBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>';
+
+    // FX Panel (hidden by default)
+    const fxPanel = document.createElement("div");
+    fxPanel.className = "mixer-fx-panel hidden";
+
+    fxBtn.addEventListener("click", () => {
+      const isHidden = fxPanel.classList.contains("hidden");
+      // Close all other FX panels
+      container.querySelectorAll(".mixer-fx-panel").forEach(p => p.classList.add("hidden"));
+      container.querySelectorAll(".mixer-fx-btn").forEach(b => b.classList.remove("is-active"));
+      if (isHidden) {
+        fxPanel.classList.remove("hidden");
+        fxBtn.classList.add("is-active");
+        renderTrackFxPanel(index, fxPanel);
+        applyTrackFx(index);
+      }
+    });
+    controls.appendChild(fxBtn);
+
     item.appendChild(info);
     item.appendChild(controls);
+    item.appendChild(fxPanel);
     container.appendChild(item);
   });
 }
 
 function saveTrackPref(songTitle, index, newPrefs) {
+  // Save to DB if active song has a DB ID
+  const dbId = window._activeSongDbId;
+  if (dbId) {
+    dbSaveTrackPrefs(dbId, index, newPrefs).catch(e =>
+      console.warn('[db] Failed to save pref:', e)
+    );
+  }
+  // Also keep localStorage as fallback
   const songId = songTitle || "UnknownSong";
   const storageKey = `am_tabs_${songId}`;
   const savedPrefs = JSON.parse(localStorage.getItem(storageKey)) || {};
@@ -291,7 +388,6 @@ function saveTrackPref(songTitle, index, newPrefs) {
 function bindControls() {
   const playButton = document.getElementById("control-play");
   const speedButton = document.getElementById("control-speed");
-  const pitchButton = document.getElementById("control-pitch");
   const loopButton = document.getElementById("control-loop");
   const slider = document.getElementById("measure-slider");
   const metronome = document.getElementById("control-metronome");
@@ -339,16 +435,7 @@ function bindControls() {
     document.getElementById("speed-readout").textContent = `${Math.round(state.speed * 100)}%`;
   });
 
-  pitchButton.addEventListener("click", () => {
-    if (!api || !api.score) return;
-    const PITCH_STEPS = [0, 1, 2, 3, -3, -2, -1];
-    const currentIndex = PITCH_STEPS.indexOf(state.pitch);
-    const nextIndex = (currentIndex + 1) % PITCH_STEPS.length;
-    state.pitch = PITCH_STEPS[nextIndex];
-    api.changeTrackTranspositionPitch(api.score.tracks, state.pitch);
-    const pitchText = state.pitch > 0 ? `+${state.pitch}` : String(state.pitch);
-    document.getElementById("pitch-readout").textContent = pitchText;
-  });
+  // Pitch shift removed - not supported by AlphaTab API
 
   loopButton.addEventListener("click", () => {
     if (!api) return;

@@ -36,19 +36,35 @@
         </div>
 
         <div class="hero-rail">
-          <div class="video-card">
-            <div class="video-thumb">
-              <div class="play-badge">Preview</div>
+          <div class="hero-search-card">
+            <div class="hero-search-bar">
+              <svg class="hero-search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="hero-search-input" placeholder="Şarkı veya sanatçı ara..." autocomplete="off">
+              <button id="hero-search-btn" class="hero-search-submit">Ara</button>
             </div>
-            <div class="video-copy">
-              <strong>Synced video mock</strong>
-              <span>Full mix / Backing / Solo</span>
-            </div>
+            <div id="hero-search-results" class="hero-search-results hidden"></div>
           </div>
-          <a class="showroom-banner" href="#">
-            <span>Upgrade to Plus</span>
-            <strong>AI transcription of full tabs</strong>
-          </a>
+          <div class="hero-actions-card">
+            <button id="hero-library-btn" class="hero-action-btn" type="button">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 016.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"></path>
+              </svg>
+              <span>Kütüphane</span>
+            </button>
+            <button id="hero-import-btn" class="hero-action-btn" type="button">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <span>Dosya Yükle</span>
+            </button>
+            <input type="file" id="hero-file-input" accept=".gp,.gp3,.gp4,.gp5,.gpx,.gp8" style="display:none">
+          </div>
         </div>
       </header>
 
@@ -90,18 +106,10 @@
             </span>
           </button>
 
-          <button id="control-pitch" class="tool-button" type="button">
-            <span class="tool-icon">P</span>
-            <span class="tool-copy">
-              <strong id="pitch-readout">0</strong>
-              <small>Pitch Shift</small>
-            </span>
-          </button>
-
-          <button id="control-loop" class="tool-button" type="button" aria-pressed="false">
+          <button id="control-loop" class="tool-button" type="button" aria-pressed="true">
             <span class="tool-icon">L</span>
             <span class="tool-copy">
-              <strong id="loop-readout">Off</strong>
+              <strong id="loop-readout">On</strong>
               <small>Loop</small>
             </span>
           </button>
@@ -133,16 +141,6 @@
         </div>
       </aside>
 
-      <section id="showroom" class="showroom-panel">
-        <div class="showroom-card">
-          <div class="showroom-copy">
-            <span>Studio feel</span>
-            <strong>Large SVG tablature, sticky transport and animated cursor</strong>
-          </div>
-          <button class="showroom-button" type="button">Explore mock controls</button>
-        </div>
-      </section>
-
       <main id="apptab" class="tab-page">
         <section id="tablature" role="application" data-id="Print--free" data-print="off" data-editor="off"></section>
       </main>
@@ -163,7 +161,37 @@
     </div>
   </div>
 
+  <!-- Library Overlay -->
+  <div id="library-overlay" class="mixer-overlay hidden">
+    <div class="mixer-modal lib-modal">
+      <div class="mixer-header">
+        <h2>Kütüphane</h2>
+        <div class="lib-header-actions">
+          <button id="lib-import-btn" class="lib-import-btn" title="Dosya Yükle">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <span>Dosya Yükle</span>
+          </button>
+          <input type="file" id="lib-file-input" accept=".gp,.gp3,.gp4,.gp5,.gpx,.gp8" style="display:none">
+          <button id="close-library-btn" class="circle-action" style="width: 36px; height: 36px;">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div id="library-list" class="lib-list">
+        <!-- Songs injected here -->
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@latest/dist/alphaTab.js"></script>
+  <script src="db.js"></script>
+  <script src="effects.js"></script>
+  <script src="songsterr.js"></script>
+  <script src="library.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
